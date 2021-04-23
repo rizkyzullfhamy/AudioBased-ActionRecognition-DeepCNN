@@ -3,6 +3,7 @@ import os
 import tensorflow as tf 
 import time
 from datetime import datetime
+import matplotlib.pyplot as plt
 from keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.preprocessing import image
@@ -78,7 +79,7 @@ def training(num_batch_size, num_epoch, loadmodel_dir,modelsaved):
     start = datetime.now()
 
     print("\nStart Training data ...\n")
-    model.fit(
+    history = model.fit(
         train_generator,
         steps_per_epoch=num_batch_size,
         epochs=num_epoch,
@@ -100,12 +101,31 @@ def training(num_batch_size, num_epoch, loadmodel_dir,modelsaved):
     # saved model after training and testing dataset 
     print("\nThe trained CNN models are complete\n")
     model.save(modelsaved)
-    time.sleep(3)
+    # time.sleep(3)
+    return history
 
-dirmodel = 'C:/Users/LENOVO/Documents/RizkyZullFhamy/TA/Model/ModelCNN.h5'
-dirsaved = "C:/Users/LENOVO/Documents/RizkyZullFhamy/TA/Model/ModelCNN_AfterTrain2.h5"
+dirmodel = 'C:/Users/LENOVO/Documents/RizkyZullFhamy/TA/Model/ModelCNN1.h5'
+dirsaved = "C:/Users/LENOVO/Documents/RizkyZullFhamy/TA/Model/ModelCNN_AfterTrain2_1.h5"
 #Load Config Tensorflow
 ConfTF()
 #Training
-training(num_batch_size,num_epoch,dirmodel,dirsaved)
+history = training(num_batch_size,num_epoch,dirmodel,dirsaved)
+# list all data in history
+print(history.history.keys())
+# summarize history for accuracy
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+# summarize history for loss
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
 

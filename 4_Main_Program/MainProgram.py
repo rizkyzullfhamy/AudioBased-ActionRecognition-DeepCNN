@@ -1,3 +1,5 @@
+# Program integrasi sistem secara keseluruhan secara realtime#
+
 # Import libraries as needed
 import argparse
 import tempfile
@@ -24,6 +26,9 @@ from keras.applications.imagenet_utils import decode_predictions
 from keras.models import Sequential
 from keras.layers import Activation, Dense, Dropout, Conv2D, MaxPooling2D, ZeroPadding2D, Flatten
 from keras.preprocessing.image import ImageDataGenerator
+import Rms
+import pubmqtt
+
 
 ######################## Function def program ####################
 def AudioRec(duration, fs, channel, deviceId, saveDir):
@@ -62,18 +67,25 @@ def NormalizeData(data):
 def ExtractFeature(path_audio, dir_saved):
     data, sr = librosa.load(path_audio, sr=None, mono=True, offset=0.0, duration=None)
     print(len(data), sr)
-    #extracting mel spectrogram feature
-    mel_spectrogram = librosa.feature.melspectrogram(data, sr=sr, n_fft=2048, hop_length=512, n_mels=128)
-    print("MEL SPECTROGRAM : ",mel_spectrogram.shape)
-    log_mel_spectrogram = librosa.power_to_db(mel_spectrogram)
-    print("LOG MEL SPECTROGRAM : ",log_mel_spectrogram.shape)
-    Norm_MelSpectrogram = NormalizeData(log_mel_spectrogram)
-    librosa.display.specshow(Norm_MelSpectrogram, sr=sr, x_axis="time", y_axis="mel")
-    #plt.colorbar()
-    #plt.show()
-    saved_file = (dir_saved + '/imagefeature.png')
-    plt.savefig(saved_file)
-    return saved_file
+    # RMS energy audio signal => untuk mengecek ada aktivitas suara atau tidak
+    Rms_Result = Rms.Rms_Audio(data, sr)
+    if (Rms_Result < threshld):
+        print("\nNo Activity\n")
+        flagg = 0
+    else:
+        #extracting mel spectrogram feature
+        mel_spectrogram = librosa.feature.melspectrogram(data, sr=sr, n_fft=2048, hop_length=512, n_mels=128)
+        print("MEL SPECTROGRAM : ",mel_spectrogram.shape)
+        log_mel_spectrogram = librosa.power_to_db(mel_spectrogram)
+        print("LOG MEL SPECTROGRAM : ",log_mel_spectrogram.shape)
+        Norm_MelSpectrogram = NormalizeData(log_mel_spectrogram)
+        librosa.display.specshow(Norm_MelSpectrogram, sr=sr, x_axis="time", y_axis="mel")
+        #plt.colorbar()
+        #plt.show()
+        saved_file = (dir_saved + '/imagefeature.png')
+        plt.savefig(saved_file)
+        flagg = 1
+    return saved_file,flagg
 
 
 def printPrediction(file_InputImage):
@@ -92,20 +104,25 @@ def printPrediction(file_InputImage):
     for i in range(len(predicted_proba)):
         print(label[i], ": ", format(predicted_proba[i], '.12f'))
         print("\n\n")
+    
+    return predicted_class
 
 ################## Init program ########################
 #class label
-label = ["Cooking", "Crying", "Eating", "ListenMusic", "NoActivity", "WashingClothes", "WashingHand", "WatchingTV"]
+label = ["Cooking", "Crying", "Eating", "ListenMusic", "WashingClothes", "WashingHand", "WatchingTV"]
 
 saved_audio = '/home/pi/ProyekAkhir/ResultAudio'
 saved_featureImage = '/home/pi/ProyekAkhir/ResultImageFeature'
+dir_SavedSpectogram = "C:/Users/LENOVO/Documents/RizkyZullFhamy/AudioBased-ActionRecognition-DeepCNN/3_Audio_Image/Result_Image/InputSpectogram.png"
 durasi_Rec = 6
 channels_Sen = 4
 device_Sen = 2 #ID device sensor
 fs = 8000
 count = 0
+Rms_Result = 0.0
+flagg = 0
+threshld = 7
 threshold = 6000     # In Milliseconds, this will cut 6 Sec of audio
-
 
 # Load Model
 print("Load Model...")
@@ -119,6 +136,8 @@ if __name__ == "__main__":
     while(True):
         audioPath = AudioRec(durasi_Rec, fs, channels_Sen, device_Sen, saved_audio)
         audioNewPath = splitaudio(saved_audio,audioPath) 
-        imageFeaturePath = ExtractFeature(audioNewPath, saved_featureImage)
-        printPrediction(imageFeaturePath)
+        imageFeaturePath, flagg = ExtractFeature(audioNewPath, saved_featureImage)
+        if (flagg != 0 ):
+            Label_Predict = printPrediction(imageFeaturePath)
+            pubmqtt.publish_MQTT('103.106.72.187', '/action/aurecog/5f8f2dd0c00456e8e03e5e9c', dir_SavedSpectogram, Label_Predict)
 
